@@ -14,24 +14,67 @@
 
 ## 2. Evidence index
 
-Điền đúng đường dẫn tới evidence thực tế. Có thể đổi tên hoặc dùng nhiều ảnh nếu cần.
+| Evidence | Đường dẫn | Ghi chú |
+|---|---|---|
+| Pytest cuối | [01-pytest.png](evidence/01-pytest.png) |  |
+| Log validator | [02-log-validator.png](evidence/02-log-validator.png) |  |
+| Dashboard validator | [03-dashboard-validator.png](evidence/03-dashboard-validator.png) |  |
+| Structured log | [04-structured-log.png](evidence/04-structured-log.png) |  |
+| PII redaction | [05-pii-redaction.png](evidence/05-pii-redaction.png), [05b-pii-cccd.png](evidence/05b-pii-cccd.png) | 05b: CCCD giả + `x-request-id` do client gửi |
+| Trace list | [06-trace-list.png](evidence/06-trace-list.png) |  |
+| Trace waterfall | [07-trace-waterfall.png](evidence/07-trace-waterfall.png) |  |
+| Trace metadata | [08-trace-metadata.png](evidence/08-trace-metadata.png), [08b-trace-metadata-attributes.png](evidence/08b-trace-metadata-attributes.png) | 08b: `correlation_id`, prompt label/version trong metadata |
+| Prompt versions | [09-prompt-versions.png](evidence/09-prompt-versions.png), [09b-prompt-v2-production.png](evidence/09b-prompt-v2-production.png) | 09b: trước rollback, `production` ở v2 |
+| Prompt rollback | [10-prompt-rollback.png](evidence/10-prompt-rollback.png) | sau rollback, `production` về v1 |
+| Dashboard runtime | [11-dashboard-overview.png](evidence/11-dashboard-overview.png) |  |
+| Incident metric | [12-incident-metric.png](evidence/12-incident-metric.png) |  |
+| Incident log | [13-incident-log.png](evidence/13-incident-log.png) |  |
+| Incident trace | [14-incident-trace.png](evidence/14-incident-trace.png) |  |
 
-| Evidence | Đường dẫn |
-|---|---|
-| Pytest cuối | `evidence/01-pytest.png` |
-| Log validator | `evidence/02-log-validator.png` |
-| Dashboard validator | `evidence/03-dashboard-validator.png` |
-| Structured log | `evidence/04-structured-log.png` |
-| PII redaction | `evidence/05-pii-redaction.png` |
-| Trace list | `evidence/06-trace-list.png` |
-| Trace waterfall | `evidence/07-trace-waterfall.png` |
-| Trace metadata | `evidence/08-trace-metadata.png` |
-| Prompt versions | `evidence/09-prompt-versions.png`, `evidence/09b-prompt-v2-production.png` (trước rollback: `production` ở v2) |
-| Prompt rollback | `evidence/10-prompt-rollback.png` (sau rollback: `production` về v1; so với `09b` trước rollback) |
-| Dashboard runtime | `evidence/11-dashboard-overview.png` |
-| Incident metric | `evidence/12-incident-metric.png` |
-| Incident log | `evidence/13-incident-log.png` |
-| Incident trace | `evidence/14-incident-trace.png` |
+### Ảnh evidence
+
+![Pytest cuối](evidence/01-pytest.png)
+
+![Log validator](evidence/02-log-validator.png)
+
+![Dashboard validator](evidence/03-dashboard-validator.png)
+
+![Structured log](evidence/04-structured-log.png)
+
+![PII redaction](evidence/05-pii-redaction.png)
+
+![PII redaction](evidence/05b-pii-cccd.png)
+
+![Trace list](evidence/06-trace-list.png)
+
+![Trace waterfall](evidence/07-trace-waterfall.png)
+
+![Trace metadata](evidence/08-trace-metadata.png)
+
+![Trace metadata](evidence/08b-trace-metadata-attributes.png)
+
+![Prompt versions](evidence/09-prompt-versions.png)
+
+![Prompt versions](evidence/09b-prompt-v2-production.png)
+
+![Prompt rollback](evidence/10-prompt-rollback.png)
+
+![Dashboard runtime](evidence/11-dashboard-overview.png)
+
+![Incident metric](evidence/12-incident-metric.png)
+
+![Incident log](evidence/13-incident-log.png)
+
+![Incident trace](evidence/14-incident-trace.png)
+
+### Source, config và runbook liên quan
+
+- Logging/PII: [app/middleware.py](../app/middleware.py), [app/logging_config.py](../app/logging_config.py), [app/pii.py](../app/pii.py), [app/main.py](../app/main.py)
+- Tracing/prompt: [app/agent.py](../app/agent.py), [app/tracing.py](../app/tracing.py), [scripts/prompt_versioning.py](../scripts/prompt_versioning.py)
+- Dashboard: [app/dashboard.py](../app/dashboard.py) (route `GET /dashboard`), contract [config/dashboard.yaml](../config/dashboard.yaml)
+- SLO và alerts: [config/slo.yaml](../config/slo.yaml), [config/alert_rules.yaml](../config/alert_rules.yaml), [docs/alerts.md](../docs/alerts.md)
+- Tests: [tests/test_pii.py](../tests/test_pii.py), [tests/test_chat_observability.py](../tests/test_chat_observability.py), [tests/test_dashboard_runtime.py](../tests/test_dashboard_runtime.py)
+- Commit bài làm: `b4a273161adb7357852ad28bf0ffe9423cece159` (`feat: complete Day 13 observability lab (CP1-CP3)`)
 
 ## 3. Kết quả kỹ thuật
 
@@ -50,7 +93,7 @@
 - **Cách tạo/nhận và truyền correlation ID:** `CorrelationIdMiddleware` (`app/middleware.py`) gọi `clear_contextvars()` ở đầu mỗi request để không rò context giữa các request. Nếu client gửi header `x-request-id` hợp lệ (chỉ gồm chữ, số, `._-`, tối đa 64 ký tự) thì dùng lại, ngược lại sinh `req-<8 hex>` từ `uuid4`. ID được `bind_contextvars` nên mọi dòng log trong request đều có `correlation_id`; ID cũng được truyền vào `agent.run(...)` để gắn vào trace, trả về trong body (`correlation_id`) và header `x-request-id`, kèm `x-response-time-ms`.
 - **Các metadata được ghi vào structured log:** `ts` (ISO, UTC), `level`, `service`, `event`, `correlation_id`, `user_id_hash` (SHA-256 cắt 12 ký tự), `session_id`, `feature`, `model`, `env`. Event `response_sent` có thêm `latency_ms`, `ttft_ms`, `tokens_in`, `tokens_out`, `cost_usd`, `quality_score`, `tool_name`, `tool_success`; event `request_failed` có `error_type`.
 - **Cách bảo đảm PII được scrub trước khi ghi:** processor `scrub_event` được đăng ký sau `format_exc_info` và trước `JsonlFileProcessor`/`JSONRenderer`, nên cả file log lẫn console chỉ nhận dữ liệu đã scrub. Scrubber duyệt đệ quy mọi giá trị chuỗi (kể cả dict/list lồng nhau và chi tiết exception), không chỉ `payload`. Pattern trong `app/pii.py`: email, số điện thoại Việt Nam (`0`/`+84`, có dấu cách/chấm/gạch), CCCD 12 số, thẻ 16 số, hộ chiếu Việt Nam; pattern thẻ chạy trước CCCD/phone để tránh bị match một phần. `user_id` gốc không bao giờ được log — chỉ ghi `user_id_hash`.
-- **Cách kiểm chứng kết quả:** đổi tên log baseline thành `data/logs.baseline.jsonl`, chạy lại `scripts/load_test.py` rồi `scripts/validate_logs.py` → 100/100, 10 correlation ID duy nhất, 0 PII leak (`evidence/02-log-validator.png`). Log mẫu cho thấy email/phone/thẻ trong câu hỏi đã thành `[REDACTED_EMAIL]`, `[REDACTED_PHONE_VN]`, `[REDACTED_CREDIT_CARD]` (`evidence/05-pii-redaction.png`). `pytest` có test tự động cho từng loại PII, cho header `x-request-id`/`x-response-time-ms`, việc tái sử dụng ID của client, enrichment và việc file log không chứa PII thô.
+- **Cách kiểm chứng kết quả:** đổi tên log baseline thành `data/logs.baseline.jsonl`, chạy lại `scripts/load_test.py` rồi `scripts/validate_logs.py` → 100/100, 10 correlation ID duy nhất, 0 PII leak (`evidence/02-log-validator.png`). Log mẫu cho thấy email/phone/thẻ trong câu hỏi đã thành `[REDACTED_EMAIL]`, `[REDACTED_PHONE_VN]`, `[REDACTED_CREDIT_CARD]` (`evidence/05-pii-redaction.png`); request có CCCD giả với `x-request-id: pii-demo-001` cho `CCCD [REDACTED_CCCD]` và giữ nguyên correlation ID do client gửi (`evidence/05b-pii-cccd.png`). `pytest` có test tự động cho từng loại PII, cho header `x-request-id`/`x-response-time-ms`, việc tái sử dụng ID của client, enrichment và việc file log không chứa PII thô.
 
 ## 5. Tracing và prompt versioning
 

@@ -155,6 +155,22 @@ git log -1 --oneline
 - [ ] `submission/REPORT.md` đã đủ; mọi ảnh dùng đường dẫn tương đối và mở được.
 - [ ] Bạn demo và giải thích được luồng Metrics → Logs → Traces → Root cause.
 
+## Chạy lại bài làm đã hoàn thiện
+
+Sau khi làm các bước ở [Bắt đầu nhanh](#bắt-đầu-nhanh) (điền key Langfuse vào `.env`, chạy `uvicorn`):
+
+```bash
+python scripts/load_test.py --concurrency 5        # tạo log + traces
+python scripts/validate_logs.py                    # 100/100
+python scripts/validate_dashboard.py               # 6/6
+python -m pytest -q
+```
+
+- Dashboard 6 panel: mở `http://127.0.0.1:8000/dashboard` (đọc `data/logs.jsonl`, 60 phút, refresh 30 s).
+- Prompt versioning: `python scripts/prompt_versioning.py setup | status | run --label <label> | promote --version <n>`.
+- Response `/chat` trả `correlation_id`, `trace_id` và `prompt_version`; header `x-request-id`, `x-response-time-ms`.
+- Kết quả, evidence và điều tra challenge: [submission/REPORT.md](submission/REPORT.md).
+
 ## Tên repo bài nộp
 
 Repo này là **repo đề bài**, nên tên chính thức là `K4-L3A-Day13-Monitoring-LLMOps` (mẫu `K4-L3A-TenBai`). Repo bài nộp cá nhân dùng mẫu:
