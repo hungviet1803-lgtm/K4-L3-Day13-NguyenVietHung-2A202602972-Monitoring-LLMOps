@@ -1,25 +1,33 @@
+# Symptom-based alerts on data/logs.jsonl; each maps to a user-visible SLO/guardrail.
 alerts:
-  - name: TODO_alert_1
-    severity: TODO
-    condition: TODO
-    duration: TODO
+  - name: HighLatencyP95
+    severity: P2
+    # Fires before the 3000 ms SLO line: the rag_slow challenge (P95 2656 ms) never crossed 3000.
+    condition: 'percentile(latency_ms where event == "response_sent", 95) > 2000 over 5m window'
+    duration: 5m
     type: symptom-based
+    slo: fast_successful_requests (latency_ms <= 3000)
     channel: slack
-    owner: TODO
+    slack_channel: '#day13-llmops-alerts'
+    owner: Nguyễn Việt Hùng (on-call LLMOps)
     runbook: docs/alerts.md#alert-1
-  - name: TODO_alert_2
-    severity: TODO
-    condition: TODO
-    duration: TODO
+  - name: HighErrorRate
+    severity: P1
+    condition: 'count(event == "request_failed") / count(event == "request_received") * 100 > 2 over 5m window and count(request_received) >= 10'
+    duration: 5m
     type: symptom-based
+    slo: guardrails.error_rate_pct_max = 2
     channel: slack
-    owner: TODO
+    slack_channel: '#day13-llmops-alerts'
+    owner: Nguyễn Việt Hùng (on-call LLMOps)
     runbook: docs/alerts.md#alert-2
-  - name: TODO_alert_3
-    severity: TODO
-    condition: TODO
-    duration: TODO
+  - name: CostPerRequestSpike
+    severity: P2
+    condition: 'mean(cost_usd where event == "response_sent") > 0.0042 (2x baseline 0.0021) over 15m window'
+    duration: 15m
     type: symptom-based
+    slo: guardrails.daily_cost_usd_max = 2.5
     channel: slack
-    owner: TODO
+    slack_channel: '#day13-llmops-alerts'
+    owner: Nguyễn Việt Hùng (on-call LLMOps)
     runbook: docs/alerts.md#alert-3

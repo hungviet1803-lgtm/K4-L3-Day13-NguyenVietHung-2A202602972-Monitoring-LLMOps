@@ -40,3 +40,24 @@ def tracing_enabled() -> bool:
     return LANGFUSE_SDK_AVAILABLE and bool(
         os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY")
     )
+
+
+class _NoopObservation:
+    def update(self, **kwargs: Any) -> "_NoopObservation":
+        return self
+
+
+@contextmanager
+def start_observation(client: Any, **kwargs: Any):
+    """Open a child observation, or a no-op when the client cannot create one."""
+    factory = getattr(client, "start_as_current_observation", None)
+    if factory is None:
+        yield _NoopObservation()
+        return
+    with factory(**kwargs) as observation:
+        yield observation
+
+
+def current_trace_id(client: Any) -> str | None:
+    getter = getattr(client, "get_current_trace_id", None)
+    return getter() if getter else None

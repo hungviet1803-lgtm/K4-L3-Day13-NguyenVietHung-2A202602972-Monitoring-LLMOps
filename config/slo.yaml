@@ -7,7 +7,19 @@ primary_slo:
     total_event: 'event == "request_received"'
   target_percent: 99.5
   error_budget_percent: 0.5
-  note: Học viên phải giải thích hoặc điều chỉnh ngưỡng bằng baseline của mình.
+  note: >-
+    Giữ ngưỡng 3000 ms và target 99.5%: baseline khi cache prompt nóng P95 ~150 ms, chỉ request
+    fetch prompt lạnh vượt 3000 ms. Request lỗi không có response_sent nên cũng là bad. Challenge
+    rag_slow cho P95 2656 ms, vẫn dưới 3000 ms, nên alert latency đặt sớm hơn ở 2000 ms
+    (cảnh báo suy giảm trước khi tiêu error budget) thay vì chờ SLO line.
+  error_budget:
+    # budget = (1 - 0.995) x total events in the 28-day window
+    formula: 'allowed_bad = 0.005 * count(request_received, 28d)'
+    example: '10,000 req/ngày x 28 ngày = 280,000 req -> tối đa 1,400 request chậm hoặc lỗi'
+    time_equivalent: '0.5% x 28 ngày = 3.36 giờ hoàn toàn hỏng'
+    burn_rate_alerts:
+      fast: 'burn rate >= 14.4 trong 1h (tiêu 2% budget/giờ) -> page P1'
+      slow: 'burn rate >= 6 trong 6h (tiêu 5% budget) -> P2 ticket'
 guardrails:
   error_rate_pct_max: 2
   daily_cost_usd_max: 2.5

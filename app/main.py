@@ -4,10 +4,11 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from structlog.contextvars import bind_contextvars
 
 from .agent import LabAgent
+from .dashboard import render_dashboard
 from .incidents import disable, enable, status
 from .logging_config import configure_logging, get_logger
 from .metrics import record_error, snapshot
@@ -46,11 +47,23 @@ async def metrics() -> dict:
     return snapshot()
 
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard() -> str:
+    return render_dashboard()
+
+
+# Sync endpoint on purpose: agent.run() blocks (retrieval + LLM), so FastAPI runs it in
+# the threadpool instead of stalling the event loop for every concurrent request.
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: Request, body: ChatRequest) -> ChatResponse:
-    # TODO: Enrich logs with request context (user_id_hash, session_id, feature, model, env)
-    # bind_contextvars(...)
-    
+def chat(request: Request, body: ChatRequest) -> ChatResponse:
+    bind_contextvars(
+        user_id_hash=hash_user_id(body.user_id),
+        session_id=body.session_id,
+        feature=body.feature,
+        model=agent.model,
+        env=os.getenv("APP_ENV", "dev"),
+    )
+
     log.info(
         "request_received",
         service="api",
@@ -75,6 +88,7 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             quality_score=result.quality_score,
             tool_name="retrieval",
             tool_success=True,
+            prompt_version=result.prompt_version,
             payload={"answer_preview": summarize_text(result.answer)},
         )
         return ChatResponse(
@@ -86,6 +100,8 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             tokens_out=result.tokens_out,
             cost_usd=result.cost_usd,
             quality_score=result.quality_score,
+            trace_id=result.trace_id,
+            prompt_version=result.prompt_version,
         )
     except Exception as exc:  # pragma: no cover
         error_type = type(exc).__name__
